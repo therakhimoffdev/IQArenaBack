@@ -227,13 +227,40 @@ export const listMatches = async (req, res) => {
 // simple question endpoint
 export const getQuestion = async (req, res) => {
     try {
-        const subject = req.query.subject || null;
-        // choose random question from sample pool for subject or any
-        const pool = subject ? QUESTIONS.filter(q => q.subject === subject) : QUESTIONS;
-        if (!pool.length) return res.status(404).json({ message: "No questions" });
+        const subject = req.query.subject; // math, english, history, programming
+
+        let pool = [];
+
+        if (subject) {
+            // ✅ TO‘G‘RI OBJECTDAN OLISH
+            pool = QUESTIONS[subject] || [];
+        } else {
+            // ✅ HAMMA FANLARDAN BIRLASHTIRISH
+            pool = [
+                ...QUESTIONS.math,
+                ...QUESTIONS.english,
+                ...QUESTIONS.history,
+                ...QUESTIONS.programming,
+            ];
+        }
+
+        if (!pool.length) {
+            return res.status(404).json({ message: "No questions found" });
+        }
+
         const q = pool[Math.floor(Math.random() * pool.length)];
-        // return minimal info: text, answers, correct (in prod do not send correct)
-        return res.json({ question: { id: q.id, text: q.text, answers: q.answers, correct: q.correct } });
+
+        // ✅ KLIENTGA FAQAT KERAKLI MAYDONLARNI QAYTARAMIZ
+        return res.json({
+            question: {
+                id: q.id,
+                question: q.question,
+                options: q.options,
+                xp: q.xp,
+                // ❌ correct/answer frontga yuborilmaydi (xavfsizlik)
+            },
+        });
+
     } catch (err) {
         console.error("getQuestion err:", err);
         res.status(500).json({ message: "Server error" });

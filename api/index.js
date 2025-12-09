@@ -19,7 +19,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/rating", ratingRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/duel", duelRoutes);
-app.use('/', (req, res) => {
+app.use('/health', (req, res) => {
     res.send('API is running...');
 });
 export default app;
