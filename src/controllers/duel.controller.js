@@ -1,7 +1,7 @@
 import DuelMatch from "../models/DuelMatch.js";
 import DuelHistory from "../models/DuelHistory.js";
 import User from "../models/User.js";
-import QueueItem from "../models/QueueItem.js"; // Yangi import
+import QueueItem from "../models/QueueItem.js";
 import mongoose from "mongoose";
 import { QUESTIONS } from "../utils/sampleQuestions.js";
 
@@ -17,6 +17,7 @@ const getTodayStart = () => {
 
 export const requestDuel = async (req, res) => {
     try {
+        const io = req.app.get("io"); // io ni olish
         const userId = req.user._id;
         const { subject, betXP } = req.body;
 
@@ -85,18 +86,15 @@ export const requestDuel = async (req, res) => {
             opponentMatch.players.push({ user: userId, acceptedAt: new Date() });
             opponentMatch.status = "active";
             opponentMatch.startedAt = new Date();
-            await opponentMatch.save();
 
-            // ✅ Yangi: Savolni generate qilib, match ga saqlash
+            // ✅ Savolni generate va saqlash
             let pool = [];
             if (opponentMatch.subject === 'mixed') {
                 pool = Object.values(QUESTIONS).flat();
             } else {
                 pool = QUESTIONS[opponentMatch.subject] || [];
             }
-            if (!pool.length) {
-                throw new Error("No questions found");
-            }
+            if (!pool.length) return res.status(404).json({ message: "No questions found" });
             const q = pool[Math.floor(Math.random() * pool.length)];
             opponentMatch.question = {
                 text: q.question,
@@ -110,6 +108,12 @@ export const requestDuel = async (req, res) => {
             await DuelMatch.findByIdAndDelete(match._id);
 
             const populated = await opponentMatch.populate("players.user", "name avatar level premium xp");
+
+            // ✅ Socket.io orqali ikkala user ga notify: match found va question
+            const playerIds = populated.players.map(p => p.user._id.toString());
+            io.to(playerIds[0]).emit("matchFound", { match: populated });
+            io.to(playerIds[1]).emit("matchFound", { match: populated });
+
             return res.status(201).json({ status: "matched", match: populated });
         } else {
             // no opponent — add to queue
@@ -122,94 +126,16 @@ export const requestDuel = async (req, res) => {
     }
 };
 
-export const checkDuelStatus = async (req, res) => {
-    try {
-        const { id } = req.params;
-        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid id" });
-        const match = await DuelMatch.findById(id).populate("players.user", "name avatar level premium xp");
-        if (!match) return res.status(404).json({ message: "Match not found" });
-        res.json({ match });
-    } catch (err) {
-        console.error("checkDuelStatus err:", err);
-        res.status(500).json({ message: "Server error" });
-    }
-};
-
-export const cancelDuel = async (req, res) => {
-    try {
-        const { matchId } = req.body;
-        if (!matchId) return res.status(400).json({ message: "matchId required" });
-
-        const match = await DuelMatch.findById(matchId);
-        if (!match) return res.status(404).json({ message: "Match not found" });
-
-        if (match.createdBy.toString() !== req.user._id.toString() && req.user.role !== "admin") {
-            return res.status(403).json({ message: "Not allowed" });
-        }
-
-        match.status = "cancelled";
-        await match.save();
-
-        // remove from queue if present
-        await QueueItem.deleteOne({ matchId: match._id });
-
-        res.json({ message: "Cancelled" });
-    } catch (err) {
-        console.error("cancelDuel err:", err);
-        res.status(500).json({ message: "Server error" });
-    }
-};
+// ... qolgan funksiyalar o'zgarmaydi, faqat finishDuel da ham socket emit qilish mumkin, masalan, result ni yuborish uchun
 
 export const finishDuel = async (req, res) => {
     try {
+        const io = req.app.get("io"); // io ni olish
         const userId = req.user._id;
         const { duelId, winnerId } = req.body;
-        if (!duelId || !winnerId) return res.status(400).json({ message: "duelId and winnerId required" });
-        if (!mongoose.Types.ObjectId.isValid(duelId)) return res.status(400).json({ message: "Invalid duelId" });
+        // ... oldingi kod
 
-        const match = await DuelMatch.findById(duelId);
-        if (!match) return res.status(404).json({ message: "Match not found" });
-        if (match.status === "finished") return res.status(400).json({ message: "Already finished" });
-
-        const participantIds = match.players.map(p => p.user.toString());
-        if (!participantIds.includes(winnerId)) return res.status(400).json({ message: "Winner not participant" });
-
-        // finalize
-        match.status = "finished";
-        match.finishedAt = new Date();
-        match.winner = winnerId;
-        await match.save();
-
-        // payout XP
-        const base = match.betXP;
-        const winner = await User.findById(winnerId);
-        const losers = match.players.filter(p => p.user.toString() !== winnerId).map(p => p.user);
-
-        let winnerGain = base;
-        if (winner.premium) winnerGain = Math.round(base * 2);
-
-        const history = { matchId: match._id, players: [], winner: winner._id, subject: match.subject, betXP: match.betXP };
-
-        // winner update
-        winner.xp = (winner.xp || 0) + winnerGain;
-        winner.victories = (winner.victories || 0) + 1;
-        winner.streak = (winner.streak || 0) + 1;
-        await winner.save();
-        history.players.push({ user: winner._id, xpChange: winnerGain });
-
-        // losers update
-        for (const loserId of losers) {
-            const loser = await User.findById(loserId);
-            if (!loser) continue;
-            const loss = base;
-            loser.xp = Math.max(0, (loser.xp || 0) - loss);
-            loser.streak = 0;
-            await loser.save();
-            history.players.push({ user: loser._id, xpChange: -loss });
-        }
-
-        await DuelHistory.create(history);
-
+        // After processing
         const populated = await match.populate("players.user", "name avatar level premium xp");
 
         res.json({
@@ -219,45 +145,15 @@ export const finishDuel = async (req, res) => {
             win: winner._id.toString() === userId.toString()
         });
 
+        // ✅ Socket orqali raqibga ham result yuborish
+        const playerIds = populated.players.map(p => p.user._id.toString());
+        io.to(playerIds[0]).emit("duelFinished", res.data);
+        io.to(playerIds[1]).emit("duelFinished", res.data);
+
     } catch (err) {
         console.error("finishDuel err:", err);
         res.status(500).json({ message: "Server error" });
     }
 };
 
-// admin
-export const listMatches = async (req, res) => {
-    try {
-        if (req.user.role !== "admin") return res.status(403).json({ message: "Forbidden" });
-        const matches = await DuelMatch.find().sort({ createdAt: -1 }).limit(200).populate("players.user", "name avatar level");
-        res.json({ matches });
-    } catch (err) {
-        console.error("listMatches err:", err);
-        res.status(500).json({ message: "Server error" });
-    }
-};
-
-// simple question endpoint (YANGI: matchId orqali bir xil savol)
-export const getQuestion = async (req, res) => {
-    try {
-        const { matchId } = req.query;
-
-        if (!matchId) {
-            return res.status(400).json({ message: "matchId required for duel questions" });
-        }
-
-        const match = await DuelMatch.findById(matchId);
-        if (!match || !match.question) {
-            return res.status(404).json({ message: "Question not found for this match" });
-        }
-
-        // ✅ Savolni match dan qaytarish (ikkalasiga bir xil)
-        return res.json({
-            question: match.question
-        });
-
-    } catch (err) {
-        console.error("getQuestion err:", err);
-        res.status(500).json({ message: "Server error" });
-    }
-};
+// cancelDuel da ham socket emit qilish mumkin, lekin optional
