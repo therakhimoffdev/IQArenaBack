@@ -1,0 +1,178 @@
+export const QUESTIONS = {
+    math: [
+        {
+            id: 1,
+            question: "5 + 7 nechaga teng?",
+            options: ["10", "11", "12", "13"],
+            answer: "12",
+            xp: 10,
+        },
+        {
+            id: 2,
+            question: "9 × 6 nechaga teng?",
+            options: ["45", "52", "54", "56"],
+            answer: "54",
+            xp: 10,
+        },
+        {
+            id: 3,
+            question: "144 ning kvadrat ildizi nechaga teng?",
+            options: ["10", "11", "12", "13"],
+            answer: "12",
+            xp: 15,
+        },
+        {
+            id: 4,
+            question: "15 ÷ 3 nechaga teng?",
+            options: ["3", "4", "5", "6"],
+            answer: "5",
+            xp: 10,
+        },
+        {
+            id: 5,
+            question: "8 × 7 nechaga teng?",
+            options: ["54", "56", "58", "60"],
+            answer: "56",
+            xp: 10,
+        },
+    ],
+
+    english: [
+        {
+            id: 1,
+            question: "‘Book’ so‘zining tarjimasi qaysi?",
+            options: ["Ruchka", "Kitob", "Daftar", "Stol"],
+            answer: "Kitob",
+            xp: 10,
+        },
+        {
+            id: 2,
+            question: "‘Apple’ so‘zining tarjimasi qaysi?",
+            options: ["Nok", "Shaftoli", "Olma", "Uzum"],
+            answer: "Olma",
+            xp: 10,
+        },
+        {
+            id: 3,
+            question: "‘Fast’ so‘zining sinonimi qaysi?",
+            options: ["Slow", "Quick", "Big", "Hot"],
+            answer: "Quick",
+            xp: 15,
+        },
+        {
+            id: 4,
+            question: "‘Teacher’ so‘zining tarjimasi qaysi?",
+            options: ["O‘quvchi", "Shifokor", "O‘qituvchi", "Haydovchi"],
+            answer: "O‘qituvchi",
+            xp: 10,
+        },
+        {
+            id: 5,
+            question: "‘House’ so‘zining tarjimasi qaysi?",
+            options: ["Bog‘", "Maktab", "Uy", "Bozor"],
+            answer: "Uy",
+            xp: 10,
+        },
+    ],
+
+    history: [
+        {
+            id: 1,
+            question: "Amir Temur qaysi yilda tug‘ilgan?",
+            options: ["1336", "1340", "1350", "1320"],
+            answer: "1336",
+            xp: 15,
+        },
+        {
+            id: 2,
+            question: "Ikkinchi Jahon urushi qaysi yilda boshlangan?",
+            options: ["1939", "1941", "1945", "1935"],
+            answer: "1939",
+            xp: 10,
+        },
+        {
+            id: 3,
+            question: "O‘zbekiston mustaqilligi qachon e’lon qilingan?",
+            options: ["1990", "1991", "1992", "1993"],
+            answer: "1991",
+            xp: 10,
+        },
+        {
+            id: 4,
+            question: "Buyuk Ipak yo‘li qaysi qit’alarni bog‘lagan?",
+            options: [
+                "Yevropa va Afrika",
+                "Osiyo va Yevropa",
+                "Afrika va Osiyo",
+                "Amerika va Yevropa",
+            ],
+            answer: "Osiyo va Yevropa",
+            xp: 15,
+        },
+        {
+            id: 5,
+            question: "Qaysi imperiya eng katta hududga ega bo‘lgan?",
+            options: [
+                "Rim imperiyasi",
+                "Mo‘g‘ullar imperiyasi",
+                "Usmoniylar imperiyasi",
+                "Britaniya imperiyasi",
+            ],
+            answer: "Britaniya imperiyasi",
+            xp: 15,
+        },
+    ],
+
+    programming: [
+        {
+            id: 1,
+            question: "JavaScript qaysi turdagi til?",
+            options: [
+                "Kompilyatsiyalanuvchi",
+                "Interpretatsiyalanuvchi",
+                "Mashina tili",
+                "Assembler",
+            ],
+            answer: "Interpretatsiyalanuvchi",
+            xp: 15,
+        },
+        {
+            id: 2,
+            question: "`const` bilan e’lon qilingan o‘zgaruvchi qayta o‘zgartiriladimi?",
+            options: ["Ha", "Yo‘q", "Ba’zida", "Faqat massivda"],
+            answer: "Yo‘q",
+            xp: 10,
+        },
+        {
+            id: 3,
+            question: "React bu nima?",
+            options: [
+                "CSS framework",
+                "JavaScript kutubxona",
+                "Backend til",
+                "Ma’lumotlar bazasi",
+            ],
+            answer: "JavaScript kutubxona",
+            xp: 15,
+        },
+        {
+            id: 4,
+            question: "API nima?",
+            options: [
+                "Dizayn vositasi",
+                "Server va klient aloqasi",
+                "Operatsion tizim",
+                "Grafik muharrir",
+            ],
+            answer: "Server va klient aloqasi",
+            xp: 15,
+        },
+        {
+            id: 5,
+            question: "Node.js qayerda ishlaydi?",
+            options: ["Brauzerda", "Serverda", "Telefon apparatida", "BIOS da"],
+            answer: "Serverda",
+            xp: 10,
+        },
+    ],
+};
