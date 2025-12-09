@@ -1,15 +1,10 @@
 import DuelMatch from "../models/DuelMatch.js";
 import DuelHistory from "../models/DuelHistory.js";
 import User from "../models/User.js";
+import QueueItem from "../models/QueueItem.js"; // Yangi import
 import mongoose from "mongoose";
 import { QUESTIONS } from "../utils/sampleQuestions.js";
 
-/*
- In-memory queue:
- queue = [{ matchId, userId, subject, betXP, level, ts }]
- For production use Redis.
-*/
-const queue = [];
 const FREEMIUM_MAX_BET = 300;
 const FREEMIUM_DAILY_LIMIT = 1000;
 const DUEL_COOLDOWN_MS = 8 * 1000;
@@ -59,38 +54,47 @@ export const requestDuel = async (req, res) => {
             status: "waiting"
         });
 
-        // Try to find opponent in queue
-        const opponentIndex = queue.findIndex(q =>
-            q.subject === subject &&
-            q.betXP === betXP &&
-            Math.abs(q.level - user.level) <= 2 &&
-            q.userId.toString() !== userId.toString()
-        );
+        // MongoDB queue dan opponent izlash
+        const queueItems = await QueueItem.find({});
+        let opponent = null;
 
-        if (opponentIndex !== -1) {
-            const opponent = queue.splice(opponentIndex, 1)[0];
-            // fetch opponent's match (waiting) to reuse or just create active match combining both
+        for (const q of queueItems) {
+            if (
+                q.subject === subject &&
+                q.betXP === betXP &&
+                Math.abs(q.level - user.level) <= 2 &&
+                q.userId.toString() !== userId.toString()
+            ) {
+                opponent = q;
+                break;
+            }
+        }
+
+        if (opponent) {
+            // Opponent topildi — queue dan o'chirish
+            await QueueItem.deleteOne({ _id: opponent._id });
+
             const opponentMatch = await DuelMatch.findById(opponent.matchId);
             if (!opponentMatch) {
-                // if missing, just push this match to queue
-                queue.push({ matchId: match._id, userId, subject, betXP, level: user.level, ts: Date.now() });
+                // Agar yo'q bo'lsa, queue ga qo'shish
+                await QueueItem.create({ matchId: match._id, userId, subject, betXP, level: user.level });
                 return res.status(201).json({ status: "waiting", matchId: match._id });
             }
 
-            // combine into active match: we will use opponentMatch as main
+            // combine into active match
             opponentMatch.players.push({ user: userId, acceptedAt: new Date() });
             opponentMatch.status = "active";
             opponentMatch.startedAt = new Date();
             await opponentMatch.save();
 
-            // remove current created waiting match since opponentMatch is used
+            // remove current waiting match
             await DuelMatch.findByIdAndDelete(match._id);
 
             const populated = await opponentMatch.populate("players.user", "name avatar level premium xp");
             return res.status(201).json({ status: "matched", match: populated });
         } else {
-            // no opponent found — add to queue
-            queue.push({ matchId: match._id, userId, subject, betXP, level: user.level, ts: Date.now() });
+            // no opponent — add to queue
+            await QueueItem.create({ matchId: match._id, userId, subject, betXP, level: user.level });
             return res.status(201).json({ status: "waiting", matchId: match._id });
         }
     } catch (err) {
@@ -128,8 +132,7 @@ export const cancelDuel = async (req, res) => {
         await match.save();
 
         // remove from queue if present
-        const idx = queue.findIndex(q => q.matchId.toString() === match._id.toString());
-        if (idx !== -1) queue.splice(idx, 1);
+        await QueueItem.deleteOne({ matchId: match._id });
 
         res.json({ message: "Cancelled" });
     } catch (err) {
@@ -138,15 +141,6 @@ export const cancelDuel = async (req, res) => {
     }
 };
 
-/**
- * finishDuel
- * body: { duelId, correct (bool) }  (client indicates whether this user answered correctly)
- *
- * Simple approach:
- * - trust the client who calls finish with winnerId OR we decide server-side by both players' submissions.
- * We'll implement: the client who calls finish with { duelId, winnerId } will set finished.
- * In production: implement mutual confirmation or signature.
- */
 export const finishDuel = async (req, res) => {
     try {
         const userId = req.user._id;
@@ -227,21 +221,18 @@ export const listMatches = async (req, res) => {
 // simple question endpoint
 export const getQuestion = async (req, res) => {
     try {
-        const subject = req.query.subject; // math, english, history, programming
+        const subject = req.query.subject; // logic, math, memory, mixed, english, history, programming
 
         let pool = [];
 
-        if (subject) {
-            // ✅ TO‘G‘RI OBJECTDAN OLISH
+        if (subject === 'mixed') {
+            // Mixed uchun hamma fanlarni aralashtirish
+            pool = Object.values(QUESTIONS).flat();
+        } else if (subject) {
             pool = QUESTIONS[subject] || [];
         } else {
-            // ✅ HAMMA FANLARDAN BIRLASHTIRISH
-            pool = [
-                ...QUESTIONS.math,
-                ...QUESTIONS.english,
-                ...QUESTIONS.history,
-                ...QUESTIONS.programming,
-            ];
+            // Default: hamma
+            pool = Object.values(QUESTIONS).flat();
         }
 
         if (!pool.length) {
@@ -250,14 +241,12 @@ export const getQuestion = async (req, res) => {
 
         const q = pool[Math.floor(Math.random() * pool.length)];
 
-        // ✅ KLIENTGA FAQAT KERAKLI MAYDONLARNI QAYTARAMIZ
         return res.json({
             question: {
-                id: q.id,
-                question: q.question,
-                options: q.options,
+                text: q.question,  // Frontendda question.text ishlatilgan
+                answers: q.options,  // answers/options
+                correct: q.correct,  // Productionda correct ni olib tashlang, server-side check qiling
                 xp: q.xp,
-                // ❌ correct/answer frontga yuborilmaydi (xavfsizlik)
             },
         });
 
