@@ -1,28 +1,25 @@
-// src/models/DuelMatch.js
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const duelMatchSchema = new mongoose.Schema({
-    subject: String,
-    betXP: Number,
-
+    subject: { type: String, required: true },
+    betXP: { type: Number, required: true },
     players: [
         {
-            user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-            acceptedAt: Date,
-        },
+            user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            acceptedAt: Date
+        }
     ],
-
-    status: {
-        type: String,
-        enum: ["waiting", "matched", "active", "finished", "cancelled"],
-        default: "waiting",
-    },
-
-    createdAt: { type: Date, default: Date.now },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    status: { type: String, enum: ['waiting', 'active', 'matched', 'finished', 'cancelled'], default: 'waiting' },
     startedAt: Date,
     finishedAt: Date,
+    winner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    question: {  // ✅ Yangi maydon: Savolni saqlash uchun
+        text: String,
+        answers: [String],
+        correct: String,
+        xp: Number
+    }
+}, { timestamps: true });
 
-    winner: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-});
-
-export default mongoose.model("DuelMatch", duelMatchSchema);
+export default mongoose.model('DuelMatch', duelMatchSchema);

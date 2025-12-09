@@ -87,6 +87,25 @@ export const requestDuel = async (req, res) => {
             opponentMatch.startedAt = new Date();
             await opponentMatch.save();
 
+            // ✅ Yangi: Savolni generate qilib, match ga saqlash
+            let pool = [];
+            if (opponentMatch.subject === 'mixed') {
+                pool = Object.values(QUESTIONS).flat();
+            } else {
+                pool = QUESTIONS[opponentMatch.subject] || [];
+            }
+            if (!pool.length) {
+                throw new Error("No questions found");
+            }
+            const q = pool[Math.floor(Math.random() * pool.length)];
+            opponentMatch.question = {
+                text: q.question,
+                answers: q.options,
+                correct: q.correct,
+                xp: q.xp
+            };
+            await opponentMatch.save();
+
             // remove current waiting match
             await DuelMatch.findByIdAndDelete(match._id);
 
@@ -218,36 +237,23 @@ export const listMatches = async (req, res) => {
     }
 };
 
-// simple question endpoint
+// simple question endpoint (YANGI: matchId orqali bir xil savol)
 export const getQuestion = async (req, res) => {
     try {
-        const subject = req.query.subject; // logic, math, memory, mixed, english, history, programming
+        const { matchId } = req.query;
 
-        let pool = [];
-
-        if (subject === 'mixed') {
-            // Mixed uchun hamma fanlarni aralashtirish
-            pool = Object.values(QUESTIONS).flat();
-        } else if (subject) {
-            pool = QUESTIONS[subject] || [];
-        } else {
-            // Default: hamma
-            pool = Object.values(QUESTIONS).flat();
+        if (!matchId) {
+            return res.status(400).json({ message: "matchId required for duel questions" });
         }
 
-        if (!pool.length) {
-            return res.status(404).json({ message: "No questions found" });
+        const match = await DuelMatch.findById(matchId);
+        if (!match || !match.question) {
+            return res.status(404).json({ message: "Question not found for this match" });
         }
 
-        const q = pool[Math.floor(Math.random() * pool.length)];
-
+        // ✅ Savolni match dan qaytarish (ikkalasiga bir xil)
         return res.json({
-            question: {
-                text: q.question,  // Frontendda question.text ishlatilgan
-                answers: q.options,  // answers/options
-                correct: q.correct,  // Productionda correct ni olib tashlang, server-side check qiling
-                xp: q.xp,
-            },
+            question: match.question
         });
 
     } catch (err) {
